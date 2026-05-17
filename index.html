@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Daily Check-In</title>
+<style>
+
+/* ─── Reset ────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 360px;
+  height: 560px;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+  color: #1a1a1a;
+  background: #F5F3EF;
+}
+
+/* ─── App shell ────────────────────────────────────────────────── */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ─── Header ────────────────────────────────────────────────────── */
+#header {
+  flex-shrink: 0;
+  height: 52px;
+  background: #1A1B2E;
+  display: flex;
+  align-items: center;
+  padding: 0 10px 0 14px;
+  -webkit-app-region: drag;
+  gap: 6px;
+}
+
+.h-icon  { font-size: 17px; flex-shrink: 0; }
+.h-title { font-size: 14px; font-weight: 700; color: #E8E6F0; letter-spacing: 0.01em; white-space: nowrap; }
+.h-date  { font-size: 11px; color: #7B79A3; white-space: nowrap; }
+.h-spacer { flex: 1; }
+.h-prog  { font-size: 11px; color: #7B79A3; white-space: nowrap; margin-right: 2px; }
+
+.h-btn {
+  -webkit-app-region: no-drag;
+  background: transparent;
+  border: none;
+  color: #7B79A3;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.h-btn:hover { background: rgba(255,255,255,0.1); color: #E8E6F0; }
+.h-btn.active { color: #E8E6F0; background: rgba(255,255,255,0.12); }
+
+/* ─── Content area ──────────────────────────────────────────────── */
+#content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 14px 14px 10px;
+  scrollbar-width: thin;
+  scrollbar-color: #D0CEC8 transparent;
+}
+#content::-webkit-scrollbar { width: 5px; }
+#content::-webkit-scrollbar-track { background: transparent; }
+#content::-webkit-scrollbar-thumb { background: #D0CEC8; border-radius: 3px; }
+
+/* ─── Section label ─────────────────────────────────────────────── */
+.section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9996B0;
+  margin-bottom: 10px;
+}
+
+/* ─── Person card (daily view) ──────────────────────────────────── */
+.card {
+  background: #fff;
+  border-radius: 12px;
+  margin-bottom: 9px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04);
+  overflow: hidden;
+  transition: box-shadow 0.15s, opacity 0.2s;
+}
+.card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.09), 0 0 0 1px rgba(0,0,0,0.06); }
+.card.is-checked { opacity: 0.6; }
+.card.is-checked .card-name { text-decoration: line-through; color: #aaa; }
+
+.card-main {
+  display: flex;
+  align-items: flex-start;
+  padding: 11px 11px 10px;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.chk {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 2px solid #C9C7D0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-top: 1px;
+  transition: background 0.15s, border-color 0.15s;
+  font-size: 13px;
+  font-weight: 700;
+  color: transparent;
+}
+.chk.on { background: #22C55E; border-color: #22C55E; color: #fff; }
+
+.card-body { flex: 1; min-width: 0; }
+.card-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card-prayer-peek {
+  font-size: 12px;
+  color: #C96B2A;
+  font-style: italic;
+  margin-bottom: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card-meta { font-size: 11px; color: #9996B0; }
+.card-meta.urgent { color: #E05252; font-weight: 600; }
+.card-meta.fresh  { color: #22C55E; font-weight: 600; }
+
+.chevron {
+  flex-shrink: 0;
+  color: #C0BDC8;
+  font-size: 13px;
+  margin-top: 3px;
+  transition: transform 0.2s, color 0.15s;
+  line-height: 1;
+}
+.chevron.open { transform: rotate(180deg); color: #6B7280; }
+
+.card-detail { display: none; border-top: 1px solid #F0EDF5; }
+.card-detail.open { display: block; }
+
+.detail-block { padding: 10px 12px; }
+.detail-block + .detail-block { border-top: 1px solid #F5F3EF; }
+
+.detail-label {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  margin-bottom: 5px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.detail-label.prayer { color: #C96B2A; }
+.detail-label.notes  { color: #4A7FC1; }
+
+.detail-body {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #4A4A5A;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.detail-empty { font-size: 12px; color: #C0BDC8; font-style: italic; }
+
+/* ─── Daily footer ──────────────────────────────────────────────── */
+.daily-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+/* ─── Text / link buttons ───────────────────────────────────────── */
+.btn-link {
+  background: transparent;
+  border: none;
+  color: #4A7FC1;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 6px 2px;
+  border-radius: 6px;
+  transition: color 0.15s;
+}
+.btn-link:hover { color: #2E5DA0; }
+
+/* ─── Empty state ───────────────────────────────────────────────── */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 36px 20px 20px;
+  gap: 10px;
+}
+.empty-icon  { font-size: 38px; }
+.empty-title { font-size: 15px; font-weight: 700; color: #4A4A5A; }
+.empty-sub   { font-size: 12.5px; color: #9B99A5; line-height: 1.5; }
+
+/* ─── List view ─────────────────────────────────────────────────── */
+.list-hdr {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+  gap: 6px;
+}
+.btn-back {
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  color: #4A7FC1;
+  cursor: pointer;
+  padding: 0 4px 0 0;
+  line-height: 1;
+  margin-top: -2px;
+}
+.list-hdr-title { font-size: 15px; font-weight: 700; }
+.list-hdr-count { font-size: 12px; color: #9B99A5; margin-left: auto; }
+
+.btn-add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 13px;
+  background: #EEF4FF;
+  border: 1.5px dashed #93C5FD;
+  border-radius: 10px;
+  color: #4A7FC1;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: 10px;
+  transition: background 0.15s;
+}
+.btn-add-row:hover { background: #DBEAFE; }
+.btn-add-row .plus { font-size: 19px; line-height: 1; }
+
+.person-row {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border-radius: 10px;
+  padding: 9px 11px;
+  margin-bottom: 7px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  gap: 10px;
+}
+.person-row-body { flex: 1; min-width: 0; }
+.person-row-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.person-row-meta { font-size: 11px; color: #9B99A5; margin-top: 1px; }
+.today-badge {
+  font-size: 10px;
+  background: #FDF3EB;
+  color: #C96B2A;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.row-actions { display: flex; gap: 3px; flex-shrink: 0; }
+.icon-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  transition: background 0.15s;
+}
+.icon-btn.edit { color: #4A7FC1; }
+.icon-btn.edit:hover { background: #EEF4FF; }
+.icon-btn.del  { color: #E05252; }
+.icon-btn.del:hover  { background: #FEF2F2; }
+
+/* ─── Edit / Add view ───────────────────────────────────────────── */
+.edit-hdr { display: flex; align-items: center; gap: 6px; margin-bottom: 16px; }
+.edit-hdr-title { font-size: 15px; font-weight: 700; }
+
+.form-group { margin-bottom: 13px; }
+.form-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6B7280;
+  margin-bottom: 5px;
+}
+.form-label.prayer { color: #C96B2A; }
+.form-label.notes  { color: #4A7FC1; }
+
+.form-input, .form-ta {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1.5px solid #E5E3E0;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-family: inherit;
+  color: #1a1a1a;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s;
+  resize: vertical;
+}
+.form-input:focus, .form-ta:focus { border-color: #4A7FC1; box-shadow: 0 0 0 3px rgba(74,127,193,0.12); }
+.form-ta { min-height: 76px; }
+
+.form-actions { display: flex; gap: 8px; margin-top: 16px; }
+.btn-primary {
+  flex: 1;
+  padding: 10px;
+  background: #4A7FC1;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-primary:hover { background: #3567AA; }
+.btn-secondary {
+  padding: 10px 16px;
+  background: #EDEDF0;
+  color: #6B7280;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-secondary:hover { background: #E2E0E5; }
+
+/* ─── Settings view ─────────────────────────────────────────────── */
+.settings-hdr { display: flex; align-items: center; gap: 6px; margin-bottom: 16px; }
+.settings-hdr-title { font-size: 15px; font-weight: 700; }
+
+.settings-block {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.settings-block-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 3px;
+}
+.settings-block-sub {
+  font-size: 11px;
+  color: #9B99A5;
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+/* Segmented / pill button group */
+.seg-group { display: flex; gap: 6px; flex-wrap: wrap; }
+.seg-btn {
+  padding: 7px 13px;
+  border: 1.5px solid #E5E3E0;
+  border-radius: 8px;
+  background: #fff;
+  color: #4A4A5A;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  min-width: 38px;
+  text-align: center;
+}
+.seg-btn:hover:not(.active) { border-color: #4A7FC1; color: #4A7FC1; }
+.seg-btn.active { background: #4A7FC1; border-color: #4A7FC1; color: #fff; font-weight: 600; }
+
+/* Corner 2×2 grid */
+.corner-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+.corner-btn {
+  padding: 10px 6px;
+  border: 1.5px solid #E5E3E0;
+  border-radius: 8px;
+  background: #fff;
+  color: #4A4A5A;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+.corner-btn:hover:not(.active) { border-color: #4A7FC1; color: #4A7FC1; }
+.corner-btn.active { background: #4A7FC1; border-color: #4A7FC1; color: #fff; font-weight: 600; }
+
+.settings-saved {
+  font-size: 11px;
+  color: #22C55E;
+  text-align: center;
+  margin-top: 10px;
+  height: 16px;
+  transition: opacity 0.3s;
+}
+
+/* ─── Confirm overlay ───────────────────────────────────────────── */
+#confirm-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(26,27,46,0.55);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+#confirm-overlay.show { display: flex; }
+.confirm-box {
+  background: #fff;
+  border-radius: 14px;
+  padding: 22px 20px 18px;
+  width: 280px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+.confirm-msg { font-size: 14px; line-height: 1.5; color: #1a1a1a; margin-bottom: 18px; }
+.confirm-actions { display: flex; gap: 8px; }
+.confirm-actions .btn-primary,
+.confirm-actions .btn-secondary { flex: 1; }
+
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ── Header ─────────────────────────────────────────────────── -->
+  <div id="header">
+    <span class="h-icon">☀️</span>
+    <span class="h-title">Daily Check-In</span>
+    <span id="h-date" class="h-date"></span>
+    <span class="h-spacer"></span>
+    <span id="h-prog" class="h-prog"></span>
+    <button class="h-btn" id="settings-btn" title="Settings">⚙</button>
+    <button class="h-btn" id="min-btn" title="Minimize">—</button>
+  </div>
+
+  <!-- ── Main content ───────────────────────────────────────────── -->
+  <div id="content"></div>
+
+</div>
+
+<!-- ── Delete confirmation overlay ──────────────────────────────── -->
+<div id="confirm-overlay">
+  <div class="confirm-box">
+    <div class="confirm-msg" id="confirm-msg"></div>
+    <div class="confirm-actions">
+      <button class="btn-secondary" id="confirm-no">Cancel</button>
+      <button class="btn-primary"   id="confirm-yes" style="background:#E05252;">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════════════════════════
+let data = {
+  contacts:   [],
+  dailyState: { date: '', todaysPeople: [], checkedOff: [] },
+  settings:   { dailyCount: 3, corner: 'bottom-right', opacity: 1.0 },
+};
+
+let view       = 'daily';
+let minimized  = false;
+let expanded   = new Set();
+let editTarget = null;
+
+// ════════════════════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', async () => {
+  data = await window.api.getData();
+  sanitize();
+  checkNewDay();
+  startDayWatcher();
+  applySettings();
+
+  document.getElementById('min-btn').addEventListener('click', toggleMinimize);
+  document.getElementById('settings-btn').addEventListener('click', () => {
+    nav(view === 'settings' ? 'daily' : 'settings');
+  });
+  document.getElementById('content').addEventListener('click', handleClick);
+  document.getElementById('confirm-no').addEventListener('click',  () => closeConfirm(false));
+  document.getElementById('confirm-yes').addEventListener('click', () => closeConfirm(true));
+
+  render();
+});
+
+// ════════════════════════════════════════════════════════════════════
+//  DATA HELPERS
+// ════════════════════════════════════════════════════════════════════
+function sanitize() {
+  if (!Array.isArray(data.contacts)) data.contacts = [];
+  if (!data.dailyState || typeof data.dailyState !== 'object') {
+    data.dailyState = { date: '', todaysPeople: [], checkedOff: [] };
+  }
+  if (!Array.isArray(data.dailyState.todaysPeople)) data.dailyState.todaysPeople = [];
+  if (!Array.isArray(data.dailyState.checkedOff))   data.dailyState.checkedOff   = [];
+  if (!data.settings || typeof data.settings !== 'object') {
+    data.settings = {};
+  }
+  // Apply defaults for any missing settings
+  if (data.settings.dailyCount == null) data.settings.dailyCount = 3;
+  if (!data.settings.corner)            data.settings.corner      = 'bottom-right';
+  if (data.settings.opacity == null)    data.settings.opacity     = 1.0;
+}
+
+async function save() {
+  await window.api.saveData(data);
+}
+
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+// Apply saved settings to the window on load
+function applySettings() {
+  window.api.setCorner(data.settings.corner);
+  window.api.setOpacity(data.settings.opacity);
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  DATE UTILITIES
+// ════════════════════════════════════════════════════════════════════
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function headerDateStr() {
+  return new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function daysSince(dateStr) {
+  if (!dateStr) return null;
+  const now  = new Date(); now.setHours(0,0,0,0);
+  const past = new Date(dateStr + 'T00:00:00');
+  return Math.floor((now - past) / 86_400_000);
+}
+
+function lastTextedLabel(contact) {
+  if (!contact.lastChecked) return { text: 'never texted', cls: 'urgent' };
+  const d = daysSince(contact.lastChecked);
+  if (d === 0) return { text: 'texted today ✓', cls: 'fresh' };
+  if (d === 1) return { text: '1 day ago',       cls: '' };
+  return { text: `${d} days ago`, cls: d >= 14 ? 'urgent' : '' };
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  DAY MANAGEMENT & ROTATION
+// ════════════════════════════════════════════════════════════════════
+function checkNewDay() {
+  const today = todayStr();
+  if (data.dailyState.date !== today) {
+    data.dailyState = {
+      date:         today,
+      todaysPeople: computeRotation(),
+      checkedOff:   [],
+    };
+    save();
+    if (minimized) {
+      minimized = false;
+      window.api.setWindowHeight(560);
+      document.getElementById('content').style.display = '';
+      document.getElementById('min-btn').textContent = '—';
+    }
+  }
+}
+
+function startDayWatcher() {
+  setInterval(() => {
+    if (data.dailyState.date !== todayStr()) {
+      checkNewDay();
+      render();
+    }
+  }, 60_000);
+}
+
+function computeRotation() {
+  if (data.contacts.length === 0) return [];
+  const count = Math.min(data.settings.dailyCount || 3, data.contacts.length);
+  const sorted = [...data.contacts].sort((a, b) => {
+    if (!a.lastChecked && !b.lastChecked) return a.name.localeCompare(b.name);
+    if (!a.lastChecked) return -1;
+    if (!b.lastChecked) return  1;
+    if (a.lastChecked < b.lastChecked) return -1;
+    if (a.lastChecked > b.lastChecked) return  1;
+    return a.name.localeCompare(b.name);
+  });
+  return sorted.slice(0, count).map(c => c.id);
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  MINIMIZE / EXPAND
+// ════════════════════════════════════════════════════════════════════
+async function toggleMinimize() {
+  minimized = !minimized;
+  const h = minimized ? 56 : 560;
+  await window.api.setWindowHeight(h);
+  document.getElementById('content').style.display = minimized ? 'none' : '';
+  document.getElementById('min-btn').textContent = minimized ? '+' : '—';
+  updateHeader();
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  HEADER
+// ════════════════════════════════════════════════════════════════════
+function updateHeader() {
+  document.getElementById('h-date').textContent = '· ' + headerDateStr();
+
+  const total   = data.dailyState.todaysPeople.length;
+  const checked = data.dailyState.checkedOff.length;
+  const progEl  = document.getElementById('h-prog');
+  progEl.textContent = (total > 0) ? `${checked}/${total}` : '';
+
+  // Highlight gear when in settings
+  document.getElementById('settings-btn').classList.toggle('active', view === 'settings');
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  ROUTING
+// ════════════════════════════════════════════════════════════════════
+function nav(newView, extra) {
+  view = newView;
+  expanded.clear();
+  if (newView === 'edit') editTarget = (extra !== undefined) ? extra : null;
+  render();
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  RENDER DISPATCH
+// ════════════════════════════════════════════════════════════════════
+function render() {
+  const el = document.getElementById('content');
+  if      (view === 'daily')    el.innerHTML = renderDaily();
+  else if (view === 'list')     el.innerHTML = renderList();
+  else if (view === 'edit')     el.innerHTML = renderEdit();
+  else if (view === 'settings') el.innerHTML = renderSettings();
+  updateHeader();
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  DAILY VIEW
+// ════════════════════════════════════════════════════════════════════
+function renderDaily() {
+  if (data.contacts.length === 0) {
+    return `
+      <div class="empty">
+        <div class="empty-icon">💬</div>
+        <div class="empty-title">No contacts yet</div>
+        <div class="empty-sub">Add the people you want to stay connected with and they'll show up here every day.</div>
+        <button class="btn-primary" style="margin-top:10px;padding:10px 22px;width:auto;" data-action="go-list">
+          Add People
+        </button>
+      </div>`;
+  }
+
+  const { todaysPeople, checkedOff } = data.dailyState;
+  const people = todaysPeople.map(id => data.contacts.find(c => c.id === id)).filter(Boolean);
+
+  if (people.length === 0) {
+    return `<div class="empty"><div class="empty-sub">No one selected for today yet.</div></div>`;
+  }
+
+  let html = `<div class="section-label">Today — ${checkedOff.length}/${people.length} texted</div>`;
+
+  people.forEach(p => {
+    const isChecked  = checkedOff.includes(p.id);
+    const isExpanded = expanded.has(p.id);
+    const lt         = lastTextedLabel(p);
+    const hasPrayer  = p.prayerRequests && p.prayerRequests.trim();
+    const hasNotes   = p.notes && p.notes.trim();
+    const peekLine   = hasPrayer ? p.prayerRequests.split('\n')[0] : '';
+
+    html += `
+      <div class="card ${isChecked ? 'is-checked' : ''}">
+        <div class="card-main" data-action="toggle-expand" data-id="${p.id}">
+          <div class="chk ${isChecked ? 'on' : ''}" data-action="toggle-check" data-id="${p.id}">
+            ${isChecked ? '✓' : ''}
+          </div>
+          <div class="card-body">
+            <div class="card-name">${esc(p.name)}</div>
+            ${peekLine ? `<div class="card-prayer-peek">🙏 ${esc(peekLine)}</div>` : ''}
+            <div class="card-meta ${lt.cls}">${lt.text}</div>
+          </div>
+          <div class="chevron ${isExpanded ? 'open' : ''}">▾</div>
+        </div>
+        <div class="card-detail ${isExpanded ? 'open' : ''}">
+          <div class="detail-block">
+            <div class="detail-label prayer">🙏 Prayer Requests</div>
+            ${hasPrayer
+              ? `<div class="detail-body">${esc(p.prayerRequests)}</div>`
+              : `<div class="detail-empty">Nothing noted yet</div>`}
+          </div>
+          <div class="detail-block">
+            <div class="detail-label notes">📝 Notes</div>
+            ${hasNotes
+              ? `<div class="detail-body">${esc(p.notes)}</div>`
+              : `<div class="detail-empty">Nothing noted yet</div>`}
+          </div>
+        </div>
+      </div>`;
+  });
+
+  html += `
+    <div class="daily-footer">
+      <button class="btn-link" data-action="go-list">Manage People →</button>
+    </div>`;
+
+  return html;
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  LIST VIEW
+// ════════════════════════════════════════════════════════════════════
+function renderList() {
+  const sorted   = [...data.contacts].sort((a, b) => a.name.localeCompare(b.name));
+  const todayIds = new Set(data.dailyState.todaysPeople);
+
+  let html = `
+    <div class="list-hdr">
+      <button class="btn-back" data-action="go-daily">‹</button>
+      <span class="list-hdr-title">People</span>
+      <span class="list-hdr-count">${data.contacts.length} total</span>
+    </div>
+    <button class="btn-add-row" data-action="add-person">
+      <span class="plus">+</span> Add a new person
+    </button>`;
+
+  if (sorted.length === 0) {
+    html += `<div class="empty" style="padding-top:16px;">
+      <div class="empty-sub">No people yet — add your first contact above.</div>
+    </div>`;
+  }
+
+  sorted.forEach(p => {
+    const lt      = lastTextedLabel(p);
+    const inToday = todayIds.has(p.id);
+    html += `
+      <div class="person-row">
+        <div class="person-row-body">
+          <div class="person-row-name">${esc(p.name)}</div>
+          <div class="person-row-meta">${lt.text}</div>
+        </div>
+        ${inToday ? `<div class="today-badge">today's ${data.settings.dailyCount}</div>` : ''}
+        <div class="row-actions">
+          <button class="icon-btn edit" data-action="edit-person" data-id="${p.id}" title="Edit">✎</button>
+          <button class="icon-btn del"  data-action="del-person"  data-id="${p.id}" title="Remove">✕</button>
+        </div>
+      </div>`;
+  });
+
+  return html;
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  EDIT / ADD VIEW
+// ════════════════════════════════════════════════════════════════════
+function renderEdit() {
+  const isNew  = !editTarget;
+  const name   = isNew ? '' : editTarget.name;
+  const prayer = isNew ? '' : (editTarget.prayerRequests || '');
+  const notes  = isNew ? '' : (editTarget.notes          || '');
+
+  return `
+    <div class="edit-hdr">
+      <button class="btn-back" data-action="go-list">‹</button>
+      <span class="edit-hdr-title">${isNew ? 'Add Person' : 'Edit Person'}</span>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Name</label>
+      <input id="f-name" class="form-input" type="text"
+             value="${esc(name)}" placeholder="Full name" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label class="form-label prayer">🙏 Prayer Requests</label>
+      <textarea id="f-prayer" class="form-ta"
+                placeholder="What should you be praying for them about?">${esc(prayer)}</textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label notes">📝 Notes</label>
+      <textarea id="f-notes" class="form-ta"
+                placeholder="Conversation notes, things to remember, follow-ups...">${esc(notes)}</textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" data-action="go-list">Cancel</button>
+      <button class="btn-primary"   data-action="save-person">Save</button>
+    </div>`;
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  SETTINGS VIEW
+// ════════════════════════════════════════════════════════════════════
+function renderSettings() {
+  const s = data.settings;
+
+  // People per day: 1–8
+  const countBtns = [1,2,3,4,5,6,7,8].map(n =>
+    `<button class="seg-btn ${s.dailyCount === n ? 'active' : ''}"
+             data-action="set-daily-count" data-val="${n}">${n}</button>`
+  ).join('');
+
+  // Window corner
+  const corners = [
+    { val: 'top-left',     label: '↖ Top Left'     },
+    { val: 'top-right',    label: '↗ Top Right'    },
+    { val: 'bottom-left',  label: '↙ Bottom Left'  },
+    { val: 'bottom-right', label: '↘ Bottom Right' },
+  ];
+  const cornerBtns = corners.map(c =>
+    `<button class="corner-btn ${s.corner === c.val ? 'active' : ''}"
+             data-action="set-corner" data-val="${c.val}">${c.label}</button>`
+  ).join('');
+
+  // Opacity
+  const opacities = [
+    { val: 1.0,  label: 'Full'  },
+    { val: 0.85, label: '85%'   },
+    { val: 0.70, label: '70%'   },
+  ];
+  const opacityBtns = opacities.map(o =>
+    `<button class="seg-btn ${Math.abs(s.opacity - o.val) < 0.01 ? 'active' : ''}"
+             data-action="set-opacity" data-val="${o.val}">${o.label}</button>`
+  ).join('');
+
+  return `
+    <div class="settings-hdr">
+      <button class="btn-back" data-action="go-daily">‹</button>
+      <span class="settings-hdr-title">Settings</span>
+    </div>
+
+    <div class="settings-block">
+      <div class="settings-block-title">People to text per day</div>
+      <div class="settings-block-sub">How many people show up in your daily rotation</div>
+      <div class="seg-group">${countBtns}</div>
+    </div>
+
+    <div class="settings-block">
+      <div class="settings-block-title">Window position</div>
+      <div class="settings-block-sub">Which corner the app lives in</div>
+      <div class="corner-grid">${cornerBtns}</div>
+    </div>
+
+    <div class="settings-block">
+      <div class="settings-block-title">Window opacity</div>
+      <div class="settings-block-sub">Useful if the app overlaps things you're working on</div>
+      <div class="seg-group">${opacityBtns}</div>
+    </div>
+
+    <div class="settings-saved" id="saved-toast"></div>`;
+}
+
+function showSavedToast() {
+  const el = document.getElementById('saved-toast');
+  if (!el) return;
+  el.textContent = '✓ Saved';
+  el.style.opacity = '1';
+  setTimeout(() => { el.style.opacity = '0'; }, 1500);
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  EVENT HANDLING
+// ════════════════════════════════════════════════════════════════════
+function handleClick(e) {
+  if (e.target.closest('input, textarea')) return;
+
+  const target = e.target.closest('[data-action]');
+  if (!target) return;
+
+  const action = target.dataset.action;
+  const id     = target.dataset.id;
+  const val    = target.dataset.val;
+
+  switch (action) {
+
+    case 'go-daily':    nav('daily');    break;
+    case 'go-list':     nav('list');     break;
+    case 'add-person':  nav('edit', null); break;
+
+    case 'edit-person': {
+      const p = data.contacts.find(c => c.id === id);
+      if (p) nav('edit', { ...p });
+      break;
+    }
+
+    case 'del-person': {
+      const p = data.contacts.find(c => c.id === id);
+      if (!p) break;
+      openConfirm(`Remove ${p.name} from your list?`, () => {
+        data.contacts = data.contacts.filter(c => c.id !== id);
+        data.dailyState.todaysPeople = data.dailyState.todaysPeople.filter(x => x !== id);
+        data.dailyState.checkedOff   = data.dailyState.checkedOff.filter(x => x !== id);
+        save();
+        render();
+      });
+      break;
+    }
+
+    case 'toggle-expand': {
+      if (e.target.closest('[data-action="toggle-check"]')) break;
+      if (expanded.has(id)) expanded.delete(id);
+      else                  expanded.add(id);
+      render();
+      break;
+    }
+
+    case 'toggle-check': {
+      e.stopPropagation();
+      const isChecked = data.dailyState.checkedOff.includes(id);
+      if (isChecked) {
+        data.dailyState.checkedOff = data.dailyState.checkedOff.filter(x => x !== id);
+      } else {
+        data.dailyState.checkedOff.push(id);
+        const p = data.contacts.find(c => c.id === id);
+        if (p) p.lastChecked = todayStr();
+      }
+      save();
+      render();
+      break;
+    }
+
+    case 'save-person': {
+      const nameEl   = document.getElementById('f-name');
+      const prayerEl = document.getElementById('f-prayer');
+      const notesEl  = document.getElementById('f-notes');
+      const nameVal  = nameEl?.value?.trim();
+
+      if (!nameVal) {
+        if (nameEl) nameEl.style.borderColor = '#E05252';
+        nameEl?.focus();
+        return;
+      }
+
+      const prayerVal = prayerEl?.value?.trim() || '';
+      const notesVal  = notesEl?.value?.trim()  || '';
+
+      if (editTarget && editTarget.id) {
+        const p = data.contacts.find(c => c.id === editTarget.id);
+        if (p) { p.name = nameVal; p.prayerRequests = prayerVal; p.notes = notesVal; }
+      } else {
+        data.contacts.push({ id: genId(), name: nameVal, prayerRequests: prayerVal, notes: notesVal, lastChecked: null });
+        if (data.contacts.length <= data.settings.dailyCount) {
+          data.dailyState.todaysPeople = computeRotation();
+        }
+      }
+      save();
+      nav('list');
+      break;
+    }
+
+    // ── Settings actions ──────────────────────────────────────────
+    case 'set-daily-count': {
+      const n = parseInt(val, 10);
+      if (!isNaN(n) && n >= 1 && n <= 8) {
+        data.settings.dailyCount = n;
+        data.dailyState.todaysPeople = computeRotation();
+        save();
+        render();
+        showSavedToast();
+      }
+      break;
+    }
+
+    case 'set-corner': {
+      data.settings.corner = val;
+      save();
+      window.api.setCorner(val);
+      render();
+      showSavedToast();
+      break;
+    }
+
+    case 'set-opacity': {
+      const op = parseFloat(val);
+      if (!isNaN(op)) {
+        data.settings.opacity = op;
+        save();
+        window.api.setOpacity(op);
+        render();
+        showSavedToast();
+      }
+      break;
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  CONFIRM OVERLAY
+// ════════════════════════════════════════════════════════════════════
+let _confirmCb = null;
+
+function openConfirm(msg, onYes) {
+  _confirmCb = onYes;
+  document.getElementById('confirm-msg').textContent = msg;
+  document.getElementById('confirm-overlay').classList.add('show');
+}
+
+function closeConfirm(confirmed) {
+  document.getElementById('confirm-overlay').classList.remove('show');
+  if (confirmed && _confirmCb) _confirmCb();
+  _confirmCb = null;
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  UTILITIES
+// ════════════════════════════════════════════════════════════════════
+function esc(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+</script>
+</body>
+</html>
